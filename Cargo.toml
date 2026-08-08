@@ -1,0 +1,19 @@
+[package]
+name = "windows-scm"
+version = "0.1.0-dev"
+edition = "2021"
+license = "MIT"
+authors = ["zevs"]
+description = "Local Service Control Manager wrapper (OpenSCManagerW/CreateService/EnumServicesStatusEx). Pre-alpha."
+repository = "https://github.com/icedracon/windows-scm"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58", features = [
+    "Win32_System_Services",
+    "Win32_Foundation",
+    "Win32_Security",
+] }
+windows-core = "0.58"
+thiserror = "2"
+
+[dev-dependencies]
