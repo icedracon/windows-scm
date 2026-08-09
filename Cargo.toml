@@ -4,8 +4,13 @@ version = "0.1.0-dev"
 edition = "2021"
 license = "MIT"
 authors = ["zevs"]
-description = "Local Service Control Manager wrapper (OpenSCManagerW/CreateService/EnumServicesStatusEx). Pre-alpha."
+description = "Safe wrapper around the local Windows Service Control Manager: OpenSCManagerW, CreateService, EnumServicesStatusEx, StartService, ControlService, QueryServiceStatusEx"
 repository = "https://github.com/icedracon/windows-scm"
+homepage = "https://github.com/icedracon/windows-scm"
+documentation = "https://docs.rs/windows-scm"
+readme = "README.md"
+keywords = ["windows", "scm", "service", "service-control-manager", "svcctl"]
+categories = ["os::windows-apis", "api-bindings"]
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.58", features = [
