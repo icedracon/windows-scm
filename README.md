@@ -77,7 +77,7 @@ fn main() -> windows_scm::Result<()> {
   SSPI Negotiate ergonomics, for the SMB / DCERPC side of the same tooling.
 
 Together these enable "run adhammer as yourself" and impersonation-based
-lateral-movement tooling without dragging in Impacket.
+lateral-movement tooling without dragging in spec-vector captures.
 
 ## License
 
