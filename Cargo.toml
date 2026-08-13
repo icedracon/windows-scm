@@ -9,7 +9,7 @@ repository = "https://github.com/icedracon/windows-scm"
 homepage = "https://github.com/icedracon/windows-scm"
 documentation = "https://docs.rs/windows-scm"
 readme = "README.md"
-keywords = ["windows", "scm", "service", "service-control-manager", "svcctl"]
+keywords = ["windows", "scm", "service", "scm", "svcctl"]
 categories = ["os::windows-apis", "api-bindings"]
 
 [target.'cfg(windows)'.dependencies]
