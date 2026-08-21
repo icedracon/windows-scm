@@ -1,17 +1,20 @@
 //! `ScmHandle`: owning wrapper for an SC_HANDLE opened via `OpenSCManagerW`.
 
 use crate::access::{ScmAccess, ServiceAccess};
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::service::Service;
 use crate::status::ServiceState;
 use crate::util::{opt_to_wide, to_wide, wide_ptr_to_string};
 
-use windows::core::PCWSTR;
-use windows::Win32::System::Services::{
-    CloseServiceHandle, EnumServicesStatusExW, OpenSCManagerW, OpenServiceW, ENUM_SERVICE_STATE,
-    ENUM_SERVICE_STATUS_PROCESSW, ENUM_SERVICE_TYPE, SC_ENUM_PROCESS_INFO, SC_HANDLE,
-    SERVICE_ACTIVE, SERVICE_DRIVER, SERVICE_INACTIVE, SERVICE_STATE_ALL, SERVICE_WIN32,
+use core::ffi::c_void;
+use win32_min::foundation::PCWSTR;
+use win32_min::services::{
+    CloseServiceHandle, EnumServicesStatusExW, OpenSCManagerW, OpenServiceW, SC_ENUM_TYPE,
+    SC_HANDLE, SERVICE_ACTIVE, SERVICE_DRIVER, SERVICE_INACTIVE, SERVICE_STATE_ALL,
+    SERVICE_WIN32_OWN_PROCESS, SERVICE_WIN32_SHARE_PROCESS, ENUM_SERVICE_STATUS_PROCESSW,
 };
+
+const SERVICE_WIN32: u32 = SERVICE_WIN32_OWN_PROCESS | SERVICE_WIN32_SHARE_PROCESS;
 
 /// Which services to include in an enumeration call.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -29,15 +32,15 @@ pub enum ServiceFilter {
 impl ServiceFilter {
     fn service_type(self) -> u32 {
         match self {
-            Self::AllIncludingDrivers => SERVICE_WIN32.0 | SERVICE_DRIVER.0,
-            _ => SERVICE_WIN32.0,
+            Self::AllIncludingDrivers => SERVICE_WIN32 | SERVICE_DRIVER,
+            _ => SERVICE_WIN32,
         }
     }
     fn service_state(self) -> u32 {
         match self {
-            Self::ActiveWin32 => SERVICE_ACTIVE.0,
-            Self::InactiveWin32 => SERVICE_INACTIVE.0,
-            Self::AllWin32 | Self::AllIncludingDrivers => SERVICE_STATE_ALL.0,
+            Self::ActiveWin32 => SERVICE_ACTIVE,
+            Self::InactiveWin32 => SERVICE_INACTIVE,
+            Self::AllWin32 | Self::AllIncludingDrivers => SERVICE_STATE_ALL,
         }
     }
 }
@@ -60,9 +63,7 @@ pub struct ScmHandle {
 }
 
 // SC_HANDLE is a raw kernel handle; owning it here is `Send + Sync`-safe as
-// long as we do not hand out references that outlive `self`. All the API
-// surface takes `&self` and returns owned data or child handles that keep no
-// reference into `self`.
+// long as we do not hand out references that outlive `self`.
 unsafe impl Send for ScmHandle {}
 unsafe impl Sync for ScmHandle {}
 
@@ -73,16 +74,21 @@ impl ScmHandle {
         let machine_ptr = machine_w
             .as_ref()
             .map(|v| PCWSTR(v.as_ptr()))
-            .unwrap_or(PCWSTR::null());
-        // Second arg (database name) NULL => SERVICES_ACTIVE_DATABASE.
-        let handle = unsafe { OpenSCManagerW(machine_ptr, PCWSTR::null(), access.bits())? };
+            .unwrap_or(PCWSTR::NULL);
+        let handle = unsafe { OpenSCManagerW(machine_ptr, PCWSTR::NULL, access.bits()) };
+        if handle.is_null() {
+            return Err(Error::from_last_os_error());
+        }
         Ok(Self { handle })
     }
 
     /// Open an existing service by name.
     pub fn open_service(&self, name: &str, access: u32) -> Result<Service> {
         let name_w = to_wide(name);
-        let handle = unsafe { OpenServiceW(self.handle, PCWSTR(name_w.as_ptr()), access)? };
+        let handle = unsafe { OpenServiceW(self.handle, PCWSTR(name_w.as_ptr()), access) };
+        if handle.is_null() {
+            return Err(Error::from_last_os_error());
+        }
         Ok(Service::from_raw(handle))
     }
 
@@ -104,49 +110,56 @@ impl ScmHandle {
         let mut services_returned: u32 = 0;
         let mut resume_handle: u32 = 0;
 
-        let sizing = unsafe {
+        let ok = unsafe {
             EnumServicesStatusExW(
                 self.handle,
-                SC_ENUM_PROCESS_INFO,
-                ENUM_SERVICE_TYPE(stype),
-                ENUM_SERVICE_STATE(sstate),
-                None,
+                SC_ENUM_TYPE::SC_ENUM_PROCESS_INFO,
+                stype,
+                sstate,
+                core::ptr::null_mut(),
+                0,
                 &mut bytes_needed,
                 &mut services_returned,
-                Some(&mut resume_handle),
-                PCWSTR::null(),
+                &mut resume_handle,
+                PCWSTR::NULL,
             )
         };
 
-        // Expected: ERROR_MORE_DATA (0xEA / 234) when buffer too small.
-        if sizing.is_ok() && bytes_needed == 0 {
-            return Ok(Vec::new());
-        }
-        if let Err(e) = sizing {
-            const ERROR_MORE_DATA: i32 = 0x800700EA_u32 as i32;
-            if e.code().0 != ERROR_MORE_DATA {
-                return Err(e.into());
+        // Expected: ERROR_MORE_DATA (234) when buffer too small.
+        const ERROR_MORE_DATA: u32 = 234;
+        if ok != 0 {
+            // No error, and if bytes_needed is 0 the service list is empty.
+            if bytes_needed == 0 {
+                return Ok(Vec::new());
+            }
+        } else {
+            let last = unsafe { win32_min::foundation::GetLastError() };
+            if last != ERROR_MORE_DATA {
+                return Err(Error::from_last_os_error());
             }
         }
 
-        // Real pass. `ENUM_SERVICE_STATUS_PROCESSW` embeds pointers into this
-        // buffer, so the buffer must live as long as we read those pointers.
+        // Real pass.
         let mut buf: Vec<u8> = vec![0u8; bytes_needed as usize];
         resume_handle = 0;
 
-        unsafe {
+        let ok = unsafe {
             EnumServicesStatusExW(
                 self.handle,
-                SC_ENUM_PROCESS_INFO,
-                ENUM_SERVICE_TYPE(stype),
-                ENUM_SERVICE_STATE(sstate),
-                Some(&mut buf[..]),
+                SC_ENUM_TYPE::SC_ENUM_PROCESS_INFO,
+                stype,
+                sstate,
+                buf.as_mut_ptr() as *mut c_void,
+                buf.len() as u32,
                 &mut bytes_needed,
                 &mut services_returned,
-                Some(&mut resume_handle),
-                PCWSTR::null(),
-            )?
+                &mut resume_handle,
+                PCWSTR::NULL,
+            )
         };
+        if ok == 0 {
+            return Err(Error::from_last_os_error());
+        }
 
         let count = services_returned as usize;
         let entries_ptr = buf.as_ptr() as *const ENUM_SERVICE_STATUS_PROCESSW;
@@ -159,8 +172,8 @@ impl ScmHandle {
             out.push(ServiceInfo {
                 name,
                 display,
-                service_type: e.ServiceStatusProcess.dwServiceType.0,
-                current_state: ServiceState::from_raw(e.ServiceStatusProcess.dwCurrentState.0),
+                service_type: e.ServiceStatusProcess.dwServiceType,
+                current_state: ServiceState::from_raw(e.ServiceStatusProcess.dwCurrentState),
                 process_id: e.ServiceStatusProcess.dwProcessId,
             });
         }
@@ -170,7 +183,7 @@ impl ScmHandle {
 
 impl Drop for ScmHandle {
     fn drop(&mut self) {
-        if !self.handle.is_invalid() {
+        if !self.handle.is_null() {
             // Ignore close errors — nothing sensible to do on drop.
             let _ = unsafe { CloseServiceHandle(self.handle) };
         }

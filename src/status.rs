@@ -1,6 +1,6 @@
 //! Service status types.
 
-use windows::Win32::System::Services::SERVICE_STATUS_PROCESS;
+use win32_min::services::SERVICE_STATUS_PROCESS;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
@@ -63,15 +63,15 @@ pub struct ServiceStatus {
 impl From<SERVICE_STATUS_PROCESS> for ServiceStatus {
     fn from(s: SERVICE_STATUS_PROCESS) -> Self {
         Self {
-            service_type: s.dwServiceType.0,
-            current_state: ServiceState::from_raw(s.dwCurrentState.0),
+            service_type: s.dwServiceType,
+            current_state: ServiceState::from_raw(s.dwCurrentState),
             controls_accepted: ControlsAccepted(s.dwControlsAccepted),
             win32_exit_code: s.dwWin32ExitCode,
             service_specific_exit_code: s.dwServiceSpecificExitCode,
             check_point: s.dwCheckPoint,
             wait_hint: s.dwWaitHint,
             process_id: s.dwProcessId,
-            service_flags: s.dwServiceFlags.0,
+            service_flags: s.dwServiceFlags,
         }
     }
 }

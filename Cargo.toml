@@ -1,24 +1,19 @@
 [package]
 name = "windows-scm"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "MIT"
 authors = ["zevs"]
-description = "Safe wrapper around the local Windows Service Control Manager: OpenSCManagerW, CreateService, EnumServicesStatusEx, StartService, ControlService, QueryServiceStatusEx"
+description = "Safe wrapper around the local Windows Service Control Manager: OpenSCManagerW, CreateService, EnumServicesStatusEx, StartService, ControlService, QueryServiceStatusEx. Built on win32-min (hand-rolled FFI, no windows-rs)."
 repository = "https://github.com/icedracon/windows-scm"
 homepage = "https://github.com/icedracon/windows-scm"
 documentation = "https://docs.rs/windows-scm"
 readme = "README.md"
-keywords = ["windows", "scm", "service", "scm", "svcctl"]
+keywords = ["windows", "scm", "service", "svcctl", "win32"]
 categories = ["os::windows-apis", "api-bindings"]
 
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.58", features = [
-    "Win32_System_Services",
-    "Win32_Foundation",
-    "Win32_Security",
-] }
-windows-core = "0.58"
+win32-min = { version = "0.1", features = ["services"] }
 thiserror = "2"
 
 [dev-dependencies]

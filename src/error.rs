@@ -17,11 +17,11 @@ pub enum Error {
     Unsupported(&'static str),
 }
 
-impl From<windows_core::Error> for Error {
-    fn from(e: windows_core::Error) -> Self {
-        Error::Win32 {
-            code: e.code().0 as u32,
-            message: e.message().to_string(),
-        }
+impl Error {
+    /// Build an `Error::Win32` from the current thread's `GetLastError()` value.
+    pub fn from_last_os_error() -> Self {
+        let code = unsafe { win32_min::foundation::GetLastError() };
+        let message = std::io::Error::from_raw_os_error(code as i32).to_string();
+        Error::Win32 { code, message }
     }
 }

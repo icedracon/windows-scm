@@ -6,12 +6,13 @@ use crate::scm::ScmHandle;
 use crate::status::{ServiceState, ServiceStatus};
 use crate::util::{opt_to_wide, to_wide};
 
+use core::ffi::c_void;
 use core::mem::size_of;
-use windows::core::PCWSTR;
-use windows::Win32::System::Services::{
+use win32_min::foundation::PCWSTR;
+use win32_min::services::{
     CloseServiceHandle, ControlService, CreateServiceW, DeleteService, QueryServiceStatusEx,
-    StartServiceW, ENUM_SERVICE_TYPE, SC_HANDLE, SC_STATUS_PROCESS_INFO, SERVICE_CONTROL_STOP,
-    SERVICE_ERROR, SERVICE_START_TYPE, SERVICE_STATUS, SERVICE_STATUS_PROCESS,
+    StartServiceW, SC_HANDLE, SC_STATUS_TYPE, SERVICE_CONTROL_STOP, SERVICE_STATUS,
+    SERVICE_STATUS_PROCESS,
 };
 
 /// `dwServiceType` values for `CreateServiceW`.
@@ -77,13 +78,19 @@ impl Service {
     /// Passing an empty slice is equivalent to `net start` with no arguments.
     pub fn start(&self, args: &[&str]) -> Result<()> {
         if args.is_empty() {
-            unsafe { StartServiceW(self.handle, None)? };
+            let ok = unsafe { StartServiceW(self.handle, 0, core::ptr::null()) };
+            if ok == 0 {
+                return Err(Error::from_last_os_error());
+            }
             return Ok(());
         }
         // Own the wide buffers, then build a parallel Vec<PCWSTR> pointing into them.
         let wides: Vec<Vec<u16>> = args.iter().map(|s| to_wide(s)).collect();
         let ptrs: Vec<PCWSTR> = wides.iter().map(|w| PCWSTR(w.as_ptr())).collect();
-        unsafe { StartServiceW(self.handle, Some(&ptrs))? };
+        let ok = unsafe { StartServiceW(self.handle, ptrs.len() as u32, ptrs.as_ptr()) };
+        if ok == 0 {
+            return Err(Error::from_last_os_error());
+        }
         Ok(())
     }
 
@@ -91,12 +98,13 @@ impl Service {
     ///
     /// `timeout_ms` == 0 sends the control and returns immediately without polling.
     pub fn stop(&self, timeout_ms: u32) -> Result<ServiceStatus> {
-        let mut st = SERVICE_STATUS::default();
-        unsafe { ControlService(self.handle, SERVICE_CONTROL_STOP, &mut st)? };
+        let mut st: SERVICE_STATUS = unsafe { core::mem::zeroed() };
+        let ok = unsafe { ControlService(self.handle, SERVICE_CONTROL_STOP, &mut st) };
+        if ok == 0 {
+            return Err(Error::from_last_os_error());
+        }
 
         if timeout_ms == 0 {
-            // Return whatever the control call reported. Note: SERVICE_STATUS
-            // has no process_id; upgrade with a QueryServiceStatusEx call.
             return self.query_status();
         }
 
@@ -117,36 +125,36 @@ impl Service {
     /// Mark the service for deletion. Actual deletion occurs when the last
     /// handle closes and no processes reference it.
     pub fn delete(self) -> Result<()> {
-        unsafe { DeleteService(self.handle)? };
-        // `self` drops here, closing the handle → SCM finishes the deletion.
+        let ok = unsafe { DeleteService(self.handle) };
+        if ok == 0 {
+            return Err(Error::from_last_os_error());
+        }
         Ok(())
     }
 
     /// Query current status (`QueryServiceStatusEx` with `SC_STATUS_PROCESS_INFO`).
     pub fn query_status(&self) -> Result<ServiceStatus> {
-        let mut buf = SERVICE_STATUS_PROCESS::default();
+        let mut buf: SERVICE_STATUS_PROCESS = unsafe { core::mem::zeroed() };
         let mut needed: u32 = 0;
-        let slice = unsafe {
-            core::slice::from_raw_parts_mut(
-                (&mut buf as *mut SERVICE_STATUS_PROCESS) as *mut u8,
-                size_of::<SERVICE_STATUS_PROCESS>(),
-            )
-        };
-        unsafe {
+        let ok = unsafe {
             QueryServiceStatusEx(
                 self.handle,
-                SC_STATUS_PROCESS_INFO,
-                Some(slice),
+                SC_STATUS_TYPE::SC_STATUS_PROCESS_INFO,
+                &mut buf as *mut SERVICE_STATUS_PROCESS as *mut c_void,
+                size_of::<SERVICE_STATUS_PROCESS>() as u32,
                 &mut needed,
-            )?
+            )
         };
+        if ok == 0 {
+            return Err(Error::from_last_os_error());
+        }
         Ok(buf.into())
     }
 }
 
 impl Drop for Service {
     fn drop(&mut self) {
-        if !self.handle.is_invalid() {
+        if !self.handle.is_null() {
             let _ = unsafe { CloseServiceHandle(self.handle) };
         }
     }
@@ -166,11 +174,11 @@ impl ScmHandle {
         let account_ptr = account_w
             .as_ref()
             .map(|v| PCWSTR(v.as_ptr()))
-            .unwrap_or(PCWSTR::null());
+            .unwrap_or(PCWSTR::NULL);
         let password_ptr = password_w
             .as_ref()
             .map(|v| PCWSTR(v.as_ptr()))
-            .unwrap_or(PCWSTR::null());
+            .unwrap_or(PCWSTR::NULL);
 
         let h = unsafe {
             CreateServiceW(
@@ -178,17 +186,20 @@ impl ScmHandle {
                 PCWSTR(name_w.as_ptr()),
                 PCWSTR(display_w.as_ptr()),
                 ServiceAccess::ALL_ACCESS.bits(),
-                ENUM_SERVICE_TYPE(cfg.service_type as u32),
-                SERVICE_START_TYPE(cfg.start_type as u32),
-                SERVICE_ERROR(cfg.error_control as u32),
+                cfg.service_type as u32,
+                cfg.start_type as u32,
+                cfg.error_control as u32,
                 PCWSTR(bin_w.as_ptr()),
-                PCWSTR::null(), // load-order group
-                None,           // tag id out-param
-                PCWSTR::null(), // dependencies (double-null-terminated)
+                PCWSTR::NULL, // load-order group
+                core::ptr::null_mut(), // tag id out-param
+                PCWSTR::NULL, // dependencies (double-null-terminated)
                 account_ptr,
                 password_ptr,
-            )?
+            )
         };
+        if h.is_null() {
+            return Err(Error::from_last_os_error());
+        }
         Ok(Service::from_raw(h))
     }
 }
