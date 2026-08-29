@@ -9,9 +9,9 @@ use crate::util::{opt_to_wide, to_wide, wide_ptr_to_string};
 use core::ffi::c_void;
 use win32_min::foundation::PCWSTR;
 use win32_min::services::{
-    CloseServiceHandle, EnumServicesStatusExW, OpenSCManagerW, OpenServiceW, SC_ENUM_TYPE,
-    SC_HANDLE, SERVICE_ACTIVE, SERVICE_DRIVER, SERVICE_INACTIVE, SERVICE_STATE_ALL,
-    SERVICE_WIN32_OWN_PROCESS, SERVICE_WIN32_SHARE_PROCESS, ENUM_SERVICE_STATUS_PROCESSW,
+    CloseServiceHandle, EnumServicesStatusExW, OpenSCManagerW, OpenServiceW,
+    ENUM_SERVICE_STATUS_PROCESSW, SC_ENUM_TYPE, SC_HANDLE, SERVICE_ACTIVE, SERVICE_DRIVER,
+    SERVICE_INACTIVE, SERVICE_STATE_ALL, SERVICE_WIN32_OWN_PROCESS, SERVICE_WIN32_SHARE_PROCESS,
 };
 
 const SERVICE_WIN32: u32 = SERVICE_WIN32_OWN_PROCESS | SERVICE_WIN32_SHARE_PROCESS;

@@ -1,6 +1,7 @@
 //! Local Service Control Manager wrapper.
 //!
-//! Pre-alpha (0.1.0-dev). See README.md for status and scope.
+//! The 0.2 series provides tested local SCM enumeration and lifecycle
+//! workflows. See README.md for current boundaries and unsupported APIs.
 //!
 //! This crate is Windows-only. On non-Windows targets it compiles to an empty
 //! module so downstream `cargo check --all-targets` stays clean.

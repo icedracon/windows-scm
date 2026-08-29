@@ -190,9 +190,9 @@ impl ScmHandle {
                 cfg.start_type as u32,
                 cfg.error_control as u32,
                 PCWSTR(bin_w.as_ptr()),
-                PCWSTR::NULL, // load-order group
+                PCWSTR::NULL,          // load-order group
                 core::ptr::null_mut(), // tag id out-param
-                PCWSTR::NULL, // dependencies (double-null-terminated)
+                PCWSTR::NULL,          // dependencies (double-null-terminated)
                 account_ptr,
                 password_ptr,
             )

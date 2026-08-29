@@ -1,0 +1,13 @@
+# windows-scm
+
+> Safe Rust workflows for the local Windows Service Control Manager: service
+> enumeration, typed access, status, control, creation, and deletion.
+
+- [README](https://github.com/icedracon/windows-scm/blob/main/README.md)
+- [API documentation](https://docs.rs/windows-scm)
+- [Ecosystem map](https://github.com/icedracon/win32-min/blob/master/ECOSYSTEM.md)
+- [ABI foundation](https://github.com/icedracon/win32-min)
+
+The crate owns SCM and service handles and closes them on drop. It targets the
+local SCM API and does not implement remote SCMR/DCERPC. Configuration-query
+and configuration-change helpers remain outside the current safe surface.

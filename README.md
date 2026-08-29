@@ -2,6 +2,7 @@
 
 [![Crates.io](https://img.shields.io/crates/v/windows-scm.svg)](https://crates.io/crates/windows-scm)
 [![Docs.rs](https://docs.rs/windows-scm/badge.svg)](https://docs.rs/windows-scm)
+[![CI](https://github.com/icedracon/windows-scm/actions/workflows/ci.yml/badge.svg)](https://github.com/icedracon/windows-scm/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Safe Rust wrapper around the **local** Windows Service Control Manager (SCM).
@@ -13,8 +14,11 @@ because it skips the RPC marshalling and named-pipe hop.
 
 ## Status
 
-**`0.1.0-dev`** — pre-alpha, expect breaking changes before `0.1.0`. Part of
-the [icedracon](https://github.com/icedracon) Rust offensive-AD ecosystem.
+**`0.2` tested companion crate.** Local enumeration, status, control,
+creation, and deletion paths are implemented on top of `win32-min`; APIs may
+still evolve before 1.0. See the central
+[`win32-min` ecosystem map](https://github.com/icedracon/win32-min/blob/master/ECOSYSTEM.md)
+for compatibility and maturity information.
 
 ## What it does
 
@@ -67,6 +71,8 @@ fn main() -> windows_scm::Result<()> {
 
 ## Related icedracon crates
 
+- [`win32-min`](https://github.com/icedracon/win32-min) — verified,
+  dependency-free Win32 ABI foundation used by this crate.
 - [`windows-token`](https://github.com/icedracon/windows-token) — RAII
   tokens + impersonation; useful when the SCM caller wants to hold
   `SeDebugPrivilege` or run under an alternate identity.
@@ -76,8 +82,14 @@ fn main() -> windows_scm::Result<()> {
 - [`windows-sspi-shim`](https://github.com/icedracon/windows-sspi-shim) —
   SSPI Negotiate ergonomics, for the SMB / DCERPC side of the same tooling.
 
-Together these enable "run adhammer as yourself" and impersonation-based
-lateral-movement tooling without dragging in spec-vector captures.
+Together these cover identity, authentication, and local administration
+workflows for Windows security research and defensive tooling.
+
+## Dependencies
+
+- `win32-min >= 0.1.2, < 0.2` with only `services` enabled.
+- `thiserror` 2 for the public error taxonomy.
+- No async runtime, serialization framework, or generated Windows bindings.
 
 ## License
 
