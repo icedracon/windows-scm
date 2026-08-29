@@ -1,0 +1,27 @@
+name: Supply chain
+
+on:
+  push:
+    paths:
+      - Cargo.toml
+      - .github/workflows/supply-chain.yml
+  pull_request:
+    paths:
+      - Cargo.toml
+      - .github/workflows/supply-chain.yml
+  schedule:
+    - cron: "29 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo generate-lockfile
+      - run: cargo install cargo-audit --locked --version 0.22.2
+      - run: cargo audit

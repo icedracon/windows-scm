@@ -4,6 +4,7 @@
 
 - Documented the runnable read-only local service inventory workflow and its
   current configuration-query boundary.
+- Added scheduled RustSec advisory auditing and weekly dependency monitoring.
 
 ## 0.2.1 - 2026-08-29
 
