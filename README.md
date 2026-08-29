@@ -48,6 +48,21 @@ fn main() -> windows_scm::Result<()> {
 }
 ```
 
+## Research workflow
+
+Produce a read-only local service inventory with state, process ID, service
+name, and display name:
+
+```powershell
+cargo run --example list_services
+```
+
+The current API intentionally does not claim executable-path or service-ACL
+analysis because full configuration queries are not implemented yet. See the
+ecosystem's
+[`RESEARCH-WORKFLOWS.md`](https://github.com/icedracon/win32-min/blob/master/RESEARCH-WORKFLOWS.md)
+for the complete workflow set.
+
 ## What works / what does not (this version)
 
 - Working:

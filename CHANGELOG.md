@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Documented the runnable read-only local service inventory workflow and its
+  current configuration-query boundary.
+
 ## 0.2.1 - 2026-08-29
 
 - Corrected stale pre-alpha and dependency documentation after the 0.2 FFI
